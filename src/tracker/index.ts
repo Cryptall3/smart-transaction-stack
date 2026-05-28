@@ -13,6 +13,7 @@ export interface LifecycleLog {
     finalizedAt?: number;
     status: 'PENDING' | 'PROCESSED' | 'CONFIRMED' | 'FINALIZED' | 'FAILED';
     failureReason?: string;
+    aiReasoning?: string;
 }
 
 export class LifecycleTracker {
@@ -112,11 +113,12 @@ export class LifecycleTracker {
         const logPath = path.join(process.cwd(), 'lifecycle_logs.json');
         fs.appendFileSync(logPath, JSON.stringify(log) + '\n');
     }
-    public logFailure(signature: string, reason: string): void {
+    public logFailure(signature: string, reason: string, aiReasoning?: string): void {
         const log = this.logs.get(signature);
         if (log) {
             log.status = 'FAILED';
             log.failureReason = reason;
+            if (aiReasoning) log.aiReasoning = aiReasoning;
             this.exportLog(log);
         } else {
             // If it wasn't tracked yet, make a dummy log
@@ -126,7 +128,8 @@ export class LifecycleTracker {
                 tipAmount: 0,
                 submittedAt: Date.now(),
                 status: 'FAILED',
-                failureReason: reason
+                failureReason: reason,
+                aiReasoning: aiReasoning
             };
             this.exportLog(dummy);
         }

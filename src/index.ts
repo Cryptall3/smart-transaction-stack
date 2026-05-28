@@ -51,8 +51,17 @@ async function runDemo() {
     // 3. Connect to Yellowstone 
     try {
         await streamer.start();
+        // Wire the streamer to the tip calculator
+        (streamer as any).onTipUpdate = (percentile: number) => {
+            engine.updateTipState(percentile);
+        };
     } catch (e) {
         logger.warn('Streamer could not connect (likely SolInfra tier restriction). Proceeding with fallback mode.');
+        // Fallback: Simulate the tip stream polling
+        setInterval(() => {
+            const mockPercentile = Math.floor(Math.random() * 50000) + 20000;
+            engine.updateTipState(mockPercentile);
+        }, 1000);
     }
 
     // 4. Generate the 10-Submission Lifecycle Log 
@@ -64,8 +73,11 @@ async function runDemo() {
         logger.info(`======================================================`);
 
         let attempt = 1;
-        const maxAttempts = 3;
-        let currentTip = 30000; // Base 0.00003 SOL tip (enough to reliably land on mainnet)
+        const maxAttempts = 5; 
+        
+        // Calculate dynamic tip based on the live stream state
+        let currentTip = engine.calculateDynamicTip({ baseFee: 10000, multiplier: 1.5, maxTip: 200000 });
+        
         let blockhash = (await connection.getLatestBlockhash('processed')).blockhash;
 
         while (attempt <= maxAttempts) {
