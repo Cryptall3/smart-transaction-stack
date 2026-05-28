@@ -107,8 +107,8 @@ async function runDemo() {
                 // --- FAULT INJECTION SIMULATION ---
                 // For submissions #4 and #7 on their first attempt, we simulate an expired blockhash.
                 if ((i === 4 || i === 7) && attempt === 1) {
-                    logger.warn('⚠️ [FAULT INJECTION] Simulating blockhash expiry by waiting 65 seconds before submission...');
-                    await sleep(65000); 
+                    logger.warn('⚠️ [FAULT INJECTION] Simulating blockhash expiry at RPC level...');
+                    throw new BundleSubmissionError("Bundle dropped by Jito Block Engine. The tip was likely too low or the blockhash expired.");
                 }
 
                 // Submit via Jito Engine
