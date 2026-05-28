@@ -22,6 +22,8 @@ async function runDemo() {
     const jitoEngineUrl = process.env.JITO_BLOCK_ENGINE_URL;
     const openaiKey = process.env.OPENAI_API_KEY;
     const privateKeyStr = process.env.PRIVATE_KEY;
+    const yellowstoneUrl = process.env.YELLOWSTONE_GRPC_ENDPOINT || '';
+    const yellowstoneToken = process.env.YELLOWSTONE_GRPC_TOKEN || '';
 
     if (!rpcUrl || !jitoEngineUrl || !openaiKey || !privateKeyStr) {
         logger.error('Missing required environment variables. Please check your .env file.');
@@ -41,7 +43,7 @@ async function runDemo() {
     const connection = new Connection(rpcUrl, 'confirmed');
 
     // 2. Initialize Core Components
-    const streamer = new NetworkStreamer();
+    const streamer = new NetworkStreamer(yellowstoneUrl, yellowstoneToken);
     const engine = new TransactionEngine(jitoEngineUrl, connection, wallet);
     const tracker = new LifecycleTracker(connection);
     const ai = new AIOperator(openaiKey);
@@ -87,10 +89,16 @@ async function runDemo() {
             await engine.submitBundle([tx], currentTip);
 
             // Wait 15 seconds to observe the lifecycle logs
-            logger.info('Waiting 15s to observe commitment level changes from the Tracker...');
+            logger.info('Waiting 15s for Jito leader to process bundle...');
             await sleep(15000);
 
-            logger.info(`Attempt ${attempt} dispatched successfully. Run complete.`);
+            // Verify if it actually landed
+            const status = await connection.getSignatureStatus(signature);
+            if (!status || !status.value) {
+                throw new BundleSubmissionError("Bundle dropped by Jito Block Engine. The tip was likely too low or the blockhash expired.");
+            }
+
+            logger.info(`Attempt ${attempt} dispatched and landed successfully. Run complete.`);
             break;
 
         } catch (error: any) {
