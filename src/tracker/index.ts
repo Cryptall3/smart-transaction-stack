@@ -112,4 +112,23 @@ export class LifecycleTracker {
         const logPath = path.join(process.cwd(), 'lifecycle_logs.json');
         fs.appendFileSync(logPath, JSON.stringify(log) + '\n');
     }
+    public logFailure(signature: string, reason: string): void {
+        const log = this.logs.get(signature);
+        if (log) {
+            log.status = 'FAILED';
+            log.failureReason = reason;
+            this.exportLog(log);
+        } else {
+            // If it wasn't tracked yet, make a dummy log
+            const dummy: LifecycleLog = {
+                signature,
+                slot: 0,
+                tipAmount: 0,
+                submittedAt: Date.now(),
+                status: 'FAILED',
+                failureReason: reason
+            };
+            this.exportLog(dummy);
+        }
+    }
 }

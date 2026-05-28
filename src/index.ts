@@ -55,57 +55,74 @@ async function runDemo() {
         logger.warn('Streamer could not connect (likely SolInfra tier restriction). Proceeding with fallback mode.');
     }
 
-    // 4. Autonomous Execution Loop
-    let attempt = 1;
-    const maxAttempts = 3;
-    let currentTip = 10000; // Base 0.00001 SOL tip
-    let blockhash = (await connection.getLatestBlockhash('processed')).blockhash;
+    // 4. Generate the 10-Submission Lifecycle Log 
+    logger.info('Starting 10-submission batch to generate lifecycle logs...');
 
-    while (attempt <= maxAttempts) {
-        logger.info(`--- BUNDLE ATTEMPT ${attempt} ---`);
-        
-        try {
-            // Construct a simple self-transfer for the demo to prove the stack works
-            const ix = SystemProgram.transfer({
-                fromPubkey: wallet.publicKey,
-                toPubkey: wallet.publicKey,
-                lamports: 1000 // 0.000001 SOL
-            });
+    for (let i = 1; i <= 10; i++) {
+        logger.info(`\n======================================================`);
+        logger.info(`🚀 INITIATING SUBMISSION ${i} OF 10`);
+        logger.info(`======================================================`);
 
-            const messageV0 = new TransactionMessage({
-                payerKey: wallet.publicKey,
-                recentBlockhash: blockhash,
-                instructions: [ix],
-            }).compileToV0Message();
+        let attempt = 1;
+        const maxAttempts = 3;
+        let currentTip = 30000; // Base 0.00003 SOL tip (enough to reliably land on mainnet)
+        let blockhash = (await connection.getLatestBlockhash('processed')).blockhash;
+
+        while (attempt <= maxAttempts) {
+            logger.info(`--- BUNDLE ATTEMPT ${attempt} ---`);
+            let signature = "";
             
-            const tx = new VersionedTransaction(messageV0);
-            tx.sign([wallet]);
+            try {
+                // Construct a simple self-transfer
+                const ix = SystemProgram.transfer({
+                    fromPubkey: wallet.publicKey,
+                    toPubkey: wallet.publicKey,
+                    lamports: 1000 // 0.000001 SOL
+                });
 
-            // Track the bundle
-            const signature = bs58.encode(tx.signatures[0]);
-            tracker.track(signature, currentTip);
+                const messageV0 = new TransactionMessage({
+                    payerKey: wallet.publicKey,
+                    recentBlockhash: blockhash,
+                    instructions: [ix],
+                }).compileToV0Message();
+                
+                const tx = new VersionedTransaction(messageV0);
+                tx.sign([wallet]);
 
-            // Submit via Jito Engine
-            await engine.submitBundle([tx], currentTip);
+                signature = bs58.encode(tx.signatures[0]);
+                tracker.track(signature, currentTip);
 
-            // Wait 15 seconds to observe the lifecycle logs
-            logger.info('Waiting 15s for Jito leader to process bundle...');
-            await sleep(15000);
+                // --- FAULT INJECTION SIMULATION ---
+                // For submissions #4 and #7 on their first attempt, we simulate an expired blockhash.
+                if ((i === 4 || i === 7) && attempt === 1) {
+                    logger.warn('⚠️ [FAULT INJECTION] Simulating blockhash expiry by waiting 65 seconds before submission...');
+                    await sleep(65000); 
+                }
 
-            // Verify if it actually landed
-            const status = await connection.getSignatureStatus(signature);
-            if (!status || !status.value) {
-                throw new BundleSubmissionError("Bundle dropped by Jito Block Engine. The tip was likely too low or the blockhash expired.");
-            }
+                // Submit via Jito Engine
+                await engine.submitBundle([tx], currentTip);
 
-            logger.info(`Attempt ${attempt} dispatched and landed successfully. Run complete.`);
-            break;
+                // Wait 15 seconds to observe the lifecycle logs
+                logger.info('Waiting 15s for Jito leader to process bundle...');
+                await sleep(15000);
 
-        } catch (error: any) {
-            if (error instanceof BundleSubmissionError || error.message.includes('BundleSubmissionError')) {
+                // Verify if it actually landed
+                const status = await connection.getSignatureStatus(signature);
+                if (!status || !status.value) {
+                    // Jito might drop it if tip is too low or blockhash expired
+                    throw new BundleSubmissionError("Bundle dropped by Jito Block Engine. The tip was likely too low or the blockhash expired.");
+                }
+
+                logger.info(`Submission ${i} landed successfully.`);
+                break;
+
+            } catch (error: any) {
+                const errorMessage = error instanceof BundleSubmissionError ? error.message : "Unknown Error: " + error.message;
+                tracker.logFailure(signature, errorMessage);
+
                 // 5. Trigger Autonomous AI Recovery
                 const decision = await ai.evaluateFailure({
-                    error: error.message,
+                    error: errorMessage,
                     slot: 0, 
                     tipAmount: currentTip,
                     blockhash: blockhash
@@ -115,22 +132,24 @@ async function runDemo() {
                     logger.error('AI Operator ordered an abort.', { reason: decision.reasoning });
                     break;
                 } else if (decision.action === 'REFRESH_BLOCKHASH') {
-                    logger.info('AI Action: Refreshing Blockhash', { reason: decision.reasoning });
+                    logger.info('🤖 AI Action: Refreshing Blockhash', { reason: decision.reasoning });
                     blockhash = (await connection.getLatestBlockhash('processed')).blockhash;
                     currentTip = Math.floor(currentTip * decision.tipAdjustmentFactor);
                 } else if (decision.action === 'INCREASE_TIP') {
-                    logger.info('AI Action: Increasing Tip', { reason: decision.reasoning });
+                    logger.info('🤖 AI Action: Increasing Tip', { reason: decision.reasoning });
                     currentTip = Math.floor(currentTip * decision.tipAdjustmentFactor);
                 }
                 
                 attempt++;
                 await sleep(2000); // Backoff before retry
-            } else {
-                logger.error('Unknown fatal error occurred', { error: error.message });
-                break;
             }
         }
+
+        // Small delay between overall submissions so we don't hit RPC rate limits
+        await sleep(3000); 
     }
+
+    logger.info('✅ 10-Submission Loop Complete! Check lifecycle_logs.json');
 }
 
 runDemo().catch(console.error);
