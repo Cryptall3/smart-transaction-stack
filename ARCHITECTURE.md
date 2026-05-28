@@ -69,3 +69,33 @@ We will build this incrementally with a focus on **modular architecture, strict 
 1. Refine the public Architecture Document.
 2. Run the full suite to generate the required 10 transaction logs (8 success, 2 failure/recovery).
 3. Answer the 3 specific README questions based on observed data.
+
+---
+
+## System Data Flow Diagram
+
+```mermaid
+flowchart TD
+    subgraph "Phase 1: Ingestion"
+        Y[Yellowstone gRPC Stream] -->|Slot/Account Updates| S(NetworkStreamer)
+        S -->|Real-time state| Core
+    end
+
+    subgraph "Phase 2 & 3: Execution"
+        Core((System Core)) -->|Builds Tx & Dynamic Tip| E(TransactionEngine)
+        E -->|Submit Bundle| Jito[Jito Block Engine]
+    end
+
+    subgraph "Phase 4: Tracking"
+        Jito -->|Included in Block| Val[Solana Validators]
+        Val -->|WebSocket Subscriptions| T(LifecycleTracker)
+        T -->|Log PENDING/PROCESSED| L[(lifecycle_logs.json)]
+    end
+
+    subgraph "Phase 5: AI Operator"
+        E -.->|Bundle Error / Expiry| AI(AIOperator)
+        AI -->|Reads Error Context| GPT[GPT-4o-mini]
+        GPT -->|Outputs JSON Decision| AI
+        AI -->|REFRESH_BLOCKHASH / INCREASE_TIP| Core
+    end
+```

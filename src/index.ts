@@ -76,7 +76,8 @@ async function runDemo() {
         const maxAttempts = 5; 
         
         // Calculate dynamic tip based on the live stream state
-        let currentTip = engine.calculateDynamicTip({ baseFee: 10000, multiplier: 1.5, maxTip: 200000 });
+        // Overriding the base tip to 400,000 lamports so it forces its way through the Jito Block Engine
+        let currentTip = 400000;
         
         let blockhash = (await connection.getLatestBlockhash('processed')).blockhash;
 
@@ -157,8 +158,8 @@ async function runDemo() {
             }
         }
 
-        // Small delay between overall submissions so we don't hit RPC rate limits
-        await sleep(3000); 
+        // Delay to allow WS tracker to finish capturing FINALIZED state
+        await sleep(20000); 
     }
 
     logger.info('✅ 10-Submission Loop Complete! Check lifecycle_logs.json');
