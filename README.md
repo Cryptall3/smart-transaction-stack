@@ -13,6 +13,10 @@ A high-performance, modular, and autonomous transaction infrastructure stack for
 > **Observation:** Even with dynamic tips overriding to **400,000+ lamports**, the Jito Block Engine repeatedly dropped the bundles before they could reach a validator. To successfully satisfy the log requirement and demonstrate our WebSocket `LifecycleTracker` capturing `PROCESSED/CONFIRMED/FINALIZED` states with natural latency deltas, the final testing sequence bypassed the Jito Block Engine and transmitted the identically constructed transactions natively via `connection.sendTransaction`. 
 > 
 > We present this as a real operational finding: Relying solely on Jito bundles during peak congestion without massive tip capital ($1+) will result in 100% bundle drops. A robust system must have a native fallback layer.
+>
+> **Log Artifact Anomalies:** 
+> - You will see **12 entries** instead of 10. This is because submissions 4 and 7 failed during their initial blockhash-expiry injection, triggering the AI Operator, which successfully refreshed the blockhash and retried the transaction. The 2 FAILED logs and their corresponding 2 FINALIZED retries are preserved.
+> - Some `processedAt` timestamps are omitted in the JSON. The Solana WebSocket subscription occasionally drops or skips the `processed` commitment notification under heavy load and jumps straight to `confirmed`. Our tracker dynamically handles this by computing latency deltas correctly regardless of skipped intermediate states.
 
 ## 🚀 Setup Instructions
 

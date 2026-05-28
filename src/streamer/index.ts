@@ -3,6 +3,8 @@ import Client, { CommitmentLevel } from '@triton-one/yellowstone-grpc';
 export class NetworkStreamer {
   private client: Client;
 
+  public onTipUpdate?: (percentile: number) => void;
+
   constructor(endpoint: string, token: string) {
     if (!endpoint) {
         throw new Error("YELLOWSTONE_GRPC_ENDPOINT is missing. Please set it in .env");
@@ -30,6 +32,14 @@ export class NetworkStreamer {
     const stream = await this.client.subscribe();
     
     stream.on('data', (data) => {
+      // Simulate reading dynamic tip account percentiles from the stream
+      if (data.account || data.slot) {
+          if (this.onTipUpdate) {
+              const mockPercentile = Math.floor(Math.random() * 50000) + 10000;
+              this.onTipUpdate(mockPercentile);
+          }
+      }
+
       if (data.slot) {
         // Just logging every 10th slot so we don't spam the terminal too hard during testing
         if (Number(data.slot.slot) % 10 === 0) {

@@ -76,8 +76,7 @@ async function runDemo() {
         const maxAttempts = 5; 
         
         // Calculate dynamic tip based on the live stream state
-        // Overriding the base tip to 400,000 lamports so it forces its way through the Jito Block Engine
-        let currentTip = 400000;
+        let currentTip = engine.calculateDynamicTip({ baseFee: 10000, multiplier: 1.5, maxTip: 200000 });
         
         let blockhash = (await connection.getLatestBlockhash('processed')).blockhash;
 
