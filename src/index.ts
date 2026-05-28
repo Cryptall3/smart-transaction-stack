@@ -130,15 +130,17 @@ async function runDemo() {
 
             } catch (error: any) {
                 const errorMessage = error instanceof BundleSubmissionError ? error.message : "Unknown Error: " + error.message;
-                tracker.logFailure(signature, errorMessage);
 
-                // 5. Trigger Autonomous AI Recovery
+                // 5. Trigger Autonomous AI Recovery First
                 const decision = await ai.evaluateFailure({
                     error: errorMessage,
                     slot: 0, 
                     tipAmount: currentTip,
                     blockhash: blockhash
                 });
+
+                // Now log the failure, including the AI's reasoning
+                tracker.logFailure(signature, errorMessage, decision.reasoning);
 
                 if (decision.action === 'ABORT') {
                     logger.error('AI Operator ordered an abort.', { reason: decision.reasoning });
